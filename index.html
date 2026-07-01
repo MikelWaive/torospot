@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ToroSpot — CSUDH Parking Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --bg: #6F263D;
+    --surface: #FFFFFF;
+    --ink: #16302B;
+    --ink-soft: #4D5C57;
+    --line: #DADFD7;
+    --gold: #C8A951;
+    --gold-dark: #8C6E2E;
+    --green-bg: #E5F2E2; --green-line:#7BAE6F; --green-text:#2C5A24;
+    --amber-bg: #FBEFDB; --amber-line:#D8A23B; --amber-text:#8A5E0D;
+    --red-bg: #F7E4E1; --red-line:#C76A57; --red-text:#8C3623;
+    --unknown-bg:#ECEDE9; --unknown-line:#B9BDB4; --unknown-text:#5C625B;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1040px; margin:0 auto; padding:28px 20px 60px;}
+  header{display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:22px; flex-wrap:wrap;}
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand-mark{
+    width:42px; height:42px; border-radius:9px; background:var(--ink);
+    color:var(--gold); display:flex; align-items:center; justify-content:center;
+    font-family:'Archivo',sans-serif; font-weight:800; font-size:18px; flex-shrink:0;
+  }
+  h1{font-family:'Archivo',sans-serif; font-weight:800; font-size:25px; margin:0; letter-spacing:-0.01em; color:#FFFFFF;}
+  .sub{font-size:13px; color:#E7C9CF; margin-top:2px;}
+  .summary{display:flex; gap:10px; flex-wrap:wrap;}
+  .pill{
+    font-size:12.5px; font-weight:600; padding:7px 13px; border-radius:100px;
+    border:1px solid var(--line); background:var(--surface); display:flex; align-items:center; gap:6px;
+  }
+  .pill .dot{width:8px; height:8px; border-radius:50%;}
+  .layout{display:grid; grid-template-columns:1.3fr 1fr; gap:22px;}
+  @media (max-width:760px){ .layout{grid-template-columns:1fr;} }
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    padding:18px 20px;
+  }
+  .card h2{font-family:'Archivo',sans-serif; font-size:15px; font-weight:700; margin:0 0 12px; letter-spacing:0.01em;}
+  .map-note{font-size:11.5px; color:var(--ink-soft); margin:10px 0 0;}
+  .list{display:flex; flex-direction:column; gap:10px; max-height:520px; overflow-y:auto;}
+  .lot-row{
+    border:1px solid var(--line); border-radius:10px; padding:12px 14px;
+    display:flex; flex-direction:column; gap:9px; background:#FCFCFB;
+  }
+  .lot-row.selected{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold);}
+  .lot-row-top{display:flex; justify-content:space-between; align-items:center;}
+  .lot-row-name{font-weight:600; font-size:14px;}
+  .lot-row-meta{font-size:11.5px; color:var(--ink-soft);}
+  .status-badge{font-size:11px; font-weight:700; padding:4px 10px; border-radius:100px; letter-spacing:0.02em;}
+  .status-Available{background:var(--green-bg); color:var(--green-text);}
+  .status-Limited{background:var(--amber-bg); color:var(--amber-text);}
+  .status-Full{background:var(--red-bg); color:var(--red-text);}
+  .status-Unknown{background:var(--unknown-bg); color:var(--unknown-text);}
+  .btn-row{display:flex; gap:6px;}
+  button.report{
+    flex:1; font-family:'Inter',sans-serif; font-size:12px; font-weight:600;
+    border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--ink-soft);
+    padding:8px 0; cursor:pointer; transition:all .12s ease;
+  }
+  button.report:hover{border-color:var(--ink-soft); color:var(--ink);}
+  button.report.b-Available:hover{background:var(--green-bg); border-color:var(--green-line); color:var(--green-text);}
+  button.report.b-Limited:hover{background:var(--amber-bg); border-color:var(--amber-line); color:var(--amber-text);}
+  button.report.b-Full:hover{background:var(--red-bg); border-color:var(--red-line); color:var(--red-text);}
+  footer{margin-top:20px; font-size:11.5px; color:#D9A9B1; text-align:center;}
+  .toast{
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(8px);
+    background:var(--ink); color:#fff; font-size:13px; font-weight:500;
+    padding:10px 18px; border-radius:9px; opacity:0; pointer-events:none;
+    transition:all .2s ease; z-index:50;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .calib-bar{
+    display:flex; align-items:center; gap:14px; background:#FFF7E6; border:1px solid var(--gold);
+    border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:13px; color:var(--gold-dark);
+  }
+  #map{height:480px; border-radius:10px; overflow:hidden;}
+  .leaflet-popup-content{font-family:'Inter',sans-serif; font-size:13px;}
+  .calib-toggle{font-size:11.5px; color:var(--ink-soft); background:none; border:none; text-decoration:underline; cursor:pointer; padding:0; margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="brand-mark">TP</div>
+      <div>
+        <h1><span style="color:#FFFFFF;">Toro</span><span style="color:#EAAA00;">Spot</span></h1>
+        <div class="sub">Live student-reported parking status — CSU Dominguez Hills</div>
+      </div>
+    </div>
+    <div class="summary" id="summary"></div>
+  </header>
+
+  <div class="calib-bar" id="calibBar" style="display:none;">
+    <span>Calibration mode: drag each pin onto its real lot, then copy the coordinates below into the LOTS array in the code.</span>
+    <button id="calibCopy" class="report" style="flex:0 0 auto; padding:8px 14px;">Copy coordinates</button>
+  </div>
+
+  <div class="layout">
+    <div class="card">
+      <h2>Campus map</h2>
+      <div id="map"></div>
+      <p class="map-note">Map data © OpenStreetMap contributors.</p>
+      <button class="calib-toggle" id="calibToggle">Enable calibration mode (fine-tune pin positions)</button>
+    </div>
+
+    <div class="card">
+      <h2>Parking lots</h2>
+      <div class="list" id="list"></div>
+    </div>
+  </div>
+
+  <footer>Reports are anonymous and expire after 3 hours. ToroSpot — CSUDH Senior Project.</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBZmqW2mGHhCYh2g4HM-qyIG3wGVAe1TFA",
+  authDomain: "torospot-9dbeb.firebaseapp.com",
+  projectId: "torospot-9dbeb",
+  storageBucket: "torospot-9dbeb.firebasestorage.app",
+  messagingSenderId: "381104245948",
+  appId: "1:381104245948:web:a97ed8e310a199df8114b9"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const CAMPUS_CENTER = [33.8588, -118.2537];
+
+const LOTS = [
+  {id:'lot1',  name:'Lot 1',  near:'Victoria St / Birch Knl East', lat:33.866460, lng:-118.251258},
+  {id:'lot2',  name:'Lot 2',  near:'Victoria St / Birch Knl West', lat:33.866140, lng:-118.253060},
+  {id:'lot3',  name:'Lot 3',  near:'Welch Hall',                   lat:33.866246, lng:-118.258680},
+  {id:'lot4a', name:'Lot 4A', near:'University Drive North',       lat:33.860135, lng:-118.256234},
+  {id:'lot4b', name:'Lot 4B', near:'University Drive South',       lat:33.859066, lng:-118.256126},
+  {id:'lot6',  name:'Lot 6',  near:'Library',                      lat:33.864251, lng:-118.258829},
+  {id:'lot7',  name:'Lot 7',  near:'SAC / CAMS',                   lat:33.862077, lng:-118.253358},
+];
+
+const COLORS = {
+  Available: {fill:'#E5F2E2', line:'#7BAE6F'},
+  Limited:   {fill:'#FBEFDB', line:'#D8A23B'},
+  Full:      {fill:'#F7E4E1', line:'#C76A57'},
+  Unknown:   {fill:'#ECEDE9', line:'#B9BDB4'}
+};
+
+let lotState = {};
+let selectedLot = null;
+let calibMode = false;
+let map, markers = {};
+
+function timeAgo(ts){
+  if(!ts) return 'no reports yet';
+  const diff = Math.floor((Date.now()-ts)/60000);
+  if(diff < 1) return 'just now';
+  if(diff < 60) return diff + ' min ago';
+  const hrs = Math.floor(diff/60);
+  if(hrs < 24) return hrs + (hrs===1?' hour ago':' hours ago');
+  return Math.floor(hrs/24) + 'd ago';
+}
+
+function effectiveStatus(entry){
+  if(!entry || !entry.ts) return 'Unknown';
+  const ageMin = (Date.now()-entry.ts)/60000;
+  if(ageMin > 180) return 'Unknown';
+  return entry.status;
+}
+
+function startListening(){
+  LOTS.forEach(lot => {
+    const ref = doc(db, 'lots', lot.id);
+    onSnapshot(ref, (snap) => {
+      lotState[lot.id] = snap.exists() ? snap.data() : null;
+      render();
+    });
+  });
+}
+
+async function reportStatus(lotId, status){
+  const entry = {status, ts: Date.now()};
+  try{
+    await setDoc(doc(db, 'lots', lotId), entry);
+    showToast(LOTS.find(l=>l.id===lotId).name + ' marked ' + status);
+  }catch(e){
+    showToast('Could not save report — check connection');
+    console.error(e);
+  }
+}
+
+function selectLot(id){
+  selectedLot = id;
+  render();
+  const row = document.querySelector('.lot-row[data-lot="'+id+'"]');
+  if(row) row.scrollIntoView({behavior:'smooth', block:'nearest'});
+  const lot = LOTS.find(l=>l.id===id);
+  if(lot && map) map.panTo([lot.lat, lot.lng]);
+}
+
+// Expose to inline onclick handlers in HTML strings
+window.reportStatus = reportStatus;
+window.selectLot = selectLot;
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+function buildSummary(){
+  const counts = {Available:0, Limited:0, Full:0, Unknown:0};
+  LOTS.forEach(l => { counts[effectiveStatus(lotState[l.id])]++; });
+  const el = document.getElementById('summary');
+  el.innerHTML = ['Available','Limited','Full','Unknown'].map(s=>
+    '<div class="pill"><span class="dot" style="background:'+COLORS[s].line+'"></span>'+counts[s]+' '+s+'</div>'
+  ).join('');
+}
+
+function lotIcon(status, isSel){
+  const c = COLORS[status];
+  const html = '<div style="width:30px;height:30px;border-radius:50%;background:'+c.fill+';'+
+    'border:2.5px solid '+(isSel?'#C8A951':c.line)+';display:flex;align-items:center;justify-content:center;'+
+    'font-family:Archivo,sans-serif;font-weight:700;font-size:10.5px;color:#16302B;box-shadow:0 1px 3px rgba(0,0,0,0.18);">'+
+    '</div>';
+  return L.divIcon({html, className:'', iconSize:[30,30], iconAnchor:[15,15]});
+}
+
+function initMap(){
+  map = L.map('map', {scrollWheelZoom:false}).setView(CAMPUS_CENTER, 16);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  LOTS.forEach(lot=>{
+    const marker = L.marker([lot.lat, lot.lng], {
+      icon: lotIcon('Unknown', false),
+      draggable: false
+    }).addTo(map);
+    marker.bindPopup('<strong>'+lot.name+'</strong><br>'+lot.near);
+    marker.on('click', ()=> selectLot(lot.id));
+    marker.on('dragend', (e)=>{
+      const pos = e.target.getLatLng();
+      lot.lat = pos.lat;
+      lot.lng = pos.lng;
+    });
+    markers[lot.id] = marker;
+  });
+}
+
+function updateMarkers(){
+  LOTS.forEach(lot=>{
+    const status = effectiveStatus(lotState[lot.id]);
+    const isSel = selectedLot === lot.id;
+    markers[lot.id].setIcon(lotIcon(status, isSel));
+  });
+}
+
+function buildList(){
+  const list = document.getElementById('list');
+  list.innerHTML = LOTS.map(lot=>{
+    const entry = lotState[lot.id];
+    const status = effectiveStatus(entry);
+    const isSel = selectedLot === lot.id;
+    return (
+      '<div class="lot-row'+(isSel?' selected':'')+'" data-lot="'+lot.id+'" onclick="selectLot(\''+lot.id+'\')">' +
+        '<div class="lot-row-top">' +
+          '<div>' +
+            '<div class="lot-row-name">'+lot.name+'</div>' +
+            '<div class="lot-row-meta">'+lot.near+'</div>' +
+          '</div>' +
+          '<span class="status-badge status-'+status+'">'+status+'</span>' +
+        '</div>' +
+        '<div class="lot-row-meta">'+timeAgo(entry && entry.ts)+'</div>' +
+        '<div class="btn-row">' +
+          '<button class="report b-Available" onclick="event.stopPropagation();reportStatus(\''+lot.id+'\',\'Available\')">Available</button>' +
+          '<button class="report b-Limited"   onclick="event.stopPropagation();reportStatus(\''+lot.id+'\',\'Limited\')">Limited</button>' +
+          '<button class="report b-Full"      onclick="event.stopPropagation();reportStatus(\''+lot.id+'\',\'Full\')">Full</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+function render(){
+  buildSummary();
+  updateMarkers();
+  buildList();
+}
+
+function toggleCalibration(){
+  calibMode = !calibMode;
+  document.getElementById('calibBar').style.display = calibMode ? 'flex' : 'none';
+  document.getElementById('calibToggle').textContent = calibMode
+    ? 'Exit calibration mode'
+    : 'Enable calibration mode (fine-tune pin positions)';
+  Object.values(markers).forEach(m => m.dragging[calibMode ? 'enable' : 'disable']());
+}
+
+function copyCoordinates(){
+  const lines = LOTS.map(l =>
+    "  {id:'"+l.id+"', name:'"+l.name+"', near:'"+l.near+"', lat:"+l.lat.toFixed(6)+", lng:"+l.lng.toFixed(6)+"},"
+  ).join('\n');
+  navigator.clipboard.writeText(lines).then(()=>{
+    showToast('Coordinates copied!');
+  }).catch(()=>{
+    console.log(lines);
+    showToast('Check console for coordinates');
+  });
+}
+
+document.getElementById('calibToggle').addEventListener('click', toggleCalibration);
+document.getElementById('calibCopy').addEventListener('click', copyCoordinates);
+
+initMap();
+startListening();
+</script>
+</body>
+</html>
