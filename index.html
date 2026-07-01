@@ -109,17 +109,11 @@
     <div class="summary" id="summary"></div>
   </header>
 
-  <div class="calib-bar" id="calibBar" style="display:none;">
-    <span>Calibration mode: drag each pin onto its real lot, then copy the coordinates below into the LOTS array in the code.</span>
-    <button id="calibCopy" class="report" style="flex:0 0 auto; padding:8px 14px;">Copy coordinates</button>
-  </div>
-
   <div class="layout">
     <div class="card">
       <h2>Campus map</h2>
       <div id="map"></div>
       <p class="map-note">Map data © OpenStreetMap contributors.</p>
-      <button class="calib-toggle" id="calibToggle">Enable calibration mode (fine-tune pin positions)</button>
     </div>
     <div class="card">
       <h2>Parking lots</h2>
@@ -323,21 +317,6 @@ function buildList(){
 }
 
 function render(){ buildSummary(); updateMarkers(); buildList(); }
-
-function toggleCalibration(){
-  calibMode = !calibMode;
-  document.getElementById('calibBar').style.display = calibMode ? 'flex' : 'none';
-  document.getElementById('calibToggle').textContent = calibMode ? 'Exit calibration mode' : 'Enable calibration mode (fine-tune pin positions)';
-  Object.values(markers).forEach(m => m.dragging[calibMode ? 'enable' : 'disable']());
-}
-
-function copyCoordinates(){
-  const lines = LOTS.map(l => "  {id:'"+l.id+"', name:'"+l.name+"', near:'"+l.near+"', lat:"+l.lat.toFixed(6)+", lng:"+l.lng.toFixed(6)+"},").join('\n');
-  navigator.clipboard.writeText(lines).then(()=>showToast('Coordinates copied!')).catch(()=>{ console.log(lines); showToast('Check console for coordinates'); });
-}
-
-document.getElementById('calibToggle').addEventListener('click', toggleCalibration);
-document.getElementById('calibCopy').addEventListener('click', copyCoordinates);
 
 initMap();
 startListening();
